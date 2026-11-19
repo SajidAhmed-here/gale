@@ -9,12 +9,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RTDS_WEBHOOK_URL: ${{ secrets.RTDS_WEBHOOK_URL }}
+      RTDS_WEBHOOK_TOKEN: ${{ secrets.RTDS_WEBHOOK_TOKEN }}
 
     steps:
+      - name: Report missing Read the Docs configuration
+        if: github.event_name != 'pull_request' && (env.RTDS_WEBHOOK_URL == '' || env.RTDS_WEBHOOK_TOKEN == '')
+        run: echo "::notice::Read the Docs webhook secrets are not configured; skipping the optional external documentation trigger."
+
       - name: Trigger RTDs build
         uses: dfm/rtds-action@v1
         with:
           webhook_url: ${{ secrets.RTDS_WEBHOOK_URL }}
           webhook_token: ${{ secrets.RTDS_WEBHOOK_TOKEN }}
           commit_ref: ${{ github.ref }}
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && env.RTDS_WEBHOOK_URL != '' && env.RTDS_WEBHOOK_TOKEN != ''
+
