@@ -3,7 +3,7 @@ name: build
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/legacy-compatibility]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,6 +13,14 @@ permissions:
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.9"
+            runtime: "numpy==1.23.2 scipy==1.9.1 scikit-learn==1.1.2 gudhi==3.6.0 kmapper==2.0.1 networkx==2.8.6 lime==0.2.0.1"
+          - python: "3.11"
+            runtime: "numpy==1.23.5 scipy==1.9.3 scikit-learn==1.1.3 gudhi==3.7.0 kmapper==2.0.1 networkx==2.8.8 lime==0.2.0.1"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -31,7 +39,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: |
             requirements.txt
@@ -43,7 +51,7 @@ jobs:
         # These versions satisfy requirements.txt and setup.py on Python 3.11.
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install -r requirements.txt . pytest pytest-cov build twine "numpy==1.26.4" "scipy==1.11.4" "scikit-learn==1.3.2"
+          python -m pip install -r requirements.txt . pytest pytest-cov build twine ${{ matrix.runtime }}
           python -m pip check
 
       - name: Test with pytest
@@ -58,7 +66,7 @@ jobs:
         # Import outside the checkout so the source tree cannot mask a bad wheel.
         run: |
           python -m venv "${RUNNER_TEMP}/gale-wheel"
-          "${RUNNER_TEMP}/gale-wheel/bin/python" -m pip install dist/*.whl "numpy==1.26.4" "scipy==1.11.4" "scikit-learn==1.3.2"
+          "${RUNNER_TEMP}/gale-wheel/bin/python" -m pip install dist/*.whl ${{ matrix.runtime }}
           "${RUNNER_TEMP}/gale-wheel/bin/python" -m pip check
           cd "${RUNNER_TEMP}"
           "${RUNNER_TEMP}/gale-wheel/bin/python" -c "from gale import create_mapper, create_pd, bottleneck_distance, bootstrap_mapper_params, mapper_to_networkx"
@@ -66,7 +74,7 @@ jobs:
       - name: Upload distributions
         uses: actions/upload-artifact@v7
         with:
-          name: gale-distributions
+          name: gale-distributions-${{ matrix.python }}
           path: dist/*
           if-no-files-found: error
 
@@ -74,6 +82,6 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: gale-coverage
+          name: gale-coverage-${{ matrix.python }}
           path: coverage.xml
           if-no-files-found: warn
